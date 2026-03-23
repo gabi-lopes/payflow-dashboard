@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PayFlow — Dashboard de Risco de Crédito</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #181c27;
+    --bg3: #1e2338;
+    --card: #1a1f2e;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8eaf0;
+    --muted: #8b90a0;
+    --accent: #4f8ef7;
+    --accent2: #7c5af3;
+    --green: #22c97b;
+    --red: #f05252;
+    --orange: #f5a623;
+    --teal: #14b8a6;
+    --pink: #ec4899;
+    --yellow: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* TOP NAV */
+  .topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; margin-right: 8px; }
+  .logo span { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+  .badge-live { background: rgba(34,201,123,0.15); color: var(--green); border: 1px solid rgba(34,201,123,0.3); border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 2px; padding: 0 24px; background: var(--bg2); border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab { padding: 12px 18px; cursor: pointer; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; transition: all .2s; user-select: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* LAYOUT */
+  .page { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* KPI CARDS */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .kpi-up { color: var(--red); }
+  .kpi-down { color: var(--green); }
+  .kpi-neutral { color: var(--accent); }
+  .kpi-warn { color: var(--orange); }
+
+  /* CHART CARDS */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-1 { margin-bottom: 16px; }
+  @media(max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .chart-sub { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+  .chart-wrap canvas { max-height: 260px; }
+  .chart-wrap-tall canvas { max-height: 340px; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .badge-red { background: rgba(240,82,82,0.15); color: var(--red); }
+  .badge-green { background: rgba(34,201,123,0.15); color: var(--green); }
+  .badge-orange { background: rgba(245,166,35,0.15); color: var(--orange); }
+  .badge-blue { background: rgba(79,142,247,0.15); color: var(--accent); }
+
+  /* PROGRESS BAR */
+  .pbar-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .pbar-label { font-size: 12px; color: var(--muted); min-width: 120px; }
+  .pbar-track { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .pbar-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+  .pbar-val { font-size: 12px; font-weight: 600; min-width: 50px; text-align: right; }
+
+  /* INSIGHTS */
+  .insight-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .insight { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .insight-icon { font-size: 20px; flex-shrink: 0; }
+  .insight-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .insight-text { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* SCATTER */
+  #scatter-wrap canvas { max-height: 320px !important; }
+
+  /* SECTION HEADER */
+  .section-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  /* HEATMAP */
+  .heatmap { display: grid; gap: 4px; }
+  .heatmap-row { display: flex; gap: 4px; align-items: center; }
+  .heatmap-label { font-size: 11px; color: var(--muted); min-width: 90px; text-align: right; }
+  .heatmap-cell { height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: white; flex: 1; }
+  .heatmap-col-labels { display: flex; gap: 4px; margin-left: 94px; margin-bottom: 4px; }
+  .heatmap-col-label { flex: 1; font-size: 10px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">PayFlow <span>Credit Risk Dashboard</span></div>
+  <div class="badge-live">● Ao vivo</div>
+  <div style="margin-left:auto;font-size:12px;color:var(--muted)">5.000 contratos &nbsp;|&nbsp; Base: payflow_credit_risk.xlsx</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab(0)">Visão Geral</div>
+  <div class="tab" onclick="showTab(1)">Análise de Default</div>
+  <div class="tab" onclick="showTab(2)">Perfil do Tomador</div>
+  <div class="tab" onclick="showTab(3)">Produtos & Canais</div>
+  <div class="tab" onclick="showTab(4)">Score & Risco</div>
+  <div class="tab" onclick="showTab(5)">Regiões</div>
+  <div class="tab" onclick="showTab(6)">Insights & Alertas</div>
+</div>
+
+<!-- ============================= TAB 0: VISÃO GERAL ============================= -->
+<div class="page active" id="page0">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Total de Contratos</div><div class="kpi-value kpi-neutral">5.000</div><div class="kpi-sub">Carteira completa</div></div>
+    <div class="kpi"><div class="kpi-label">Total em Default</div><div class="kpi-value kpi-up">609</div><div class="kpi-sub">Status &gt; 90 dias</div></div>
+    <div class="kpi"><div class="kpi-label">Taxa de Default</div><div class="kpi-value kpi-up">12,18%</div><div class="kpi-sub">Benchmark: 8-10%</div></div>
+    <div class="kpi"><div class="kpi-label">Carteira Total</div><div class="kpi-value kpi-neutral">R$ 56,4M</div><div class="kpi-sub">Valor solicitado</div></div>
+    <div class="kpi"><div class="kpi-label">Exposição em Default</div><div class="kpi-value kpi-up">R$ 9,9M</div><div class="kpi-sub">17,5% da carteira</div></div>
+    <div class="kpi"><div class="kpi-label">Ticket Médio</div><div class="kpi-value kpi-neutral">R$ 11.278</div><div class="kpi-sub">Valor médio por contrato</div></div>
+    <div class="kpi"><div class="kpi-label">Score Médio</div><div class="kpi-value kpi-warn">653,6</div><div class="kpi-sub">Faixa: 300–900</div></div>
+    <div class="kpi"><div class="kpi-label">Prazo Médio</div><div class="kpi-value kpi-neutral">25,4 meses</div><div class="kpi-sub">Média da carteira</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Distribuição por Status (90d)</div>
+      <div class="chart-sub">Composição da carteira por situação atual</div>
+      <div class="chart-wrap"><canvas id="c-status-donut"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Distribuição por Produto</div>
+      <div class="chart-sub">Volume de contratos por tipo de produto</div>
+      <div class="chart-wrap"><canvas id="c-produto-bar"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="chart-card">
+      <div class="chart-title">Contratos por Canal</div>
+      <div class="chart-sub">Volume por canal de aquisição</div>
+      <div class="chart-wrap"><canvas id="c-canal-donut"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Contratos por Região</div>
+      <div class="chart-sub">Distribuição geográfica</div>
+      <div class="chart-wrap"><canvas id="c-regiao-bar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Distribuição de Score</div>
+      <div class="chart-sub">Histograma do score de crédito</div>
+      <div class="chart-wrap"><canvas id="c-score-hist"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= TAB 1: ANÁLISE DE DEFAULT ============================= -->
+<div class="page" id="page1">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Taxa Default Geral</div><div class="kpi-value kpi-up">12,18%</div><div class="kpi-sub">609 de 5.000</div></div>
+    <div class="kpi"><div class="kpi-label">Default BNPL</div><div class="kpi-value kpi-up">15,76%</div><div class="kpi-sub">Produto mais crítico</div></div>
+    <div class="kpi"><div class="kpi-label">Default Parceiro</div><div class="kpi-value kpi-up">14,42%</div><div class="kpi-sub">Canal mais crítico</div></div>
+    <div class="kpi"><div class="kpi-label">Default Renda &lt;2k</div><div class="kpi-value kpi-up">18,64%</div><div class="kpi-sub">Maior risco por renda</div></div>
+    <div class="kpi"><div class="kpi-label">Default Score &lt;550</div><div class="kpi-value kpi-up">17,8%</div><div class="kpi-sub">Score baixo</div></div>
+    <div class="kpi"><div class="kpi-label">Default 1+ Inadimpl.</div><div class="kpi-value kpi-up">19,2%</div><div class="kpi-sub">c/ histórico negativo</div></div>
+    <div class="kpi"><div class="kpi-label">Default Atraso 61d+</div><div class="kpi-value kpi-up">48,3%</div><div class="kpi-sub">Altíssimo risco</div></div>
+    <div class="kpi"><div class="kpi-label">Contratos em Atraso Leve</div><div class="kpi-value kpi-warn">463</div><div class="kpi-sub">Risco latente 9,3%</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Taxa de Default por Produto</div>
+      <div class="chart-sub">Percentual de inadimplência por tipo de produto</div>
+      <div class="chart-wrap"><canvas id="c-default-produto"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Taxa de Default por Canal</div>
+      <div class="chart-sub">Percentual de inadimplência por canal de aquisição</div>
+      <div class="chart-wrap"><canvas id="c-default-canal"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Default por Faixa de Dias em Atraso (12m)</div>
+      <div class="chart-sub">Taxa de default cresce com o histórico de atraso</div>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="c-default-atraso"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Default por Nº de Inadimplências Anteriores</div>
+      <div class="chart-sub">Clientes com histórico negativo têm maior risco</div>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="c-default-inadimp"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-1">
+    <div class="chart-card">
+      <div class="chart-title">Tabela Detalhada de Default por Segmento</div>
+      <div class="chart-sub">Defaults, total e taxa por dimensão de análise</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Segmento</th><th>Dimensão</th><th>Contratos</th><th>Defaults</th><th>Taxa</th><th>Classificação de Risco</th></tr></thead>
+          <tbody>
+            <tr><td>BNPL</td><td>Produto</td><td>736</td><td>116</td><td><span class="badge badge-red">15,76%</span></td><td><span class="badge badge-red">Alto</span></td></tr>
+            <tr><td>Cartão</td><td>Produto</td><td>1.799</td><td>216</td><td><span class="badge badge-orange">12,01%</span></td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Empréstimo Pessoal</td><td>Produto</td><td>2.465</td><td>277</td><td><span class="badge badge-orange">11,24%</span></td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Parceiro</td><td>Canal</td><td>749</td><td>108</td><td><span class="badge badge-red">14,42%</span></td><td><span class="badge badge-red">Alto</span></td></tr>
+            <tr><td>Loja</td><td>Canal</td><td>746</td><td>95</td><td><span class="badge badge-orange">12,73%</span></td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Site</td><td>Canal</td><td>1.274</td><td>150</td><td><span class="badge badge-orange">11,77%</span></td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>App</td><td>Canal</td><td>2.231</td><td>256</td><td><span class="badge badge-green">11,47%</span></td><td><span class="badge badge-green">Baixo</span></td></tr>
+            <tr><td>Norte</td><td>Região</td><td>333</td><td>45</td><td><span class="badge badge-red">13,51%</span></td><td><span class="badge badge-red">Alto</span></td></tr>
+            <tr><td>Nordeste</td><td>Região</td><td>956</td><td>121</td><td><span class="badge badge-orange">12,66%</span></td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Sudeste</td><td>Região</td><td>2.300</td><td>289</td><td><span class="badge badge-orange">12,57%</span></td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Sul</td><td>Região</td><td>800</td><td>90</td><td><span class="badge badge-orange">11,25%</span></td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Centro-Oeste</td><td>Região</td><td>611</td><td>64</td><td><span class="badge badge-green">10,47%</span></td><td><span class="badge badge-green">Baixo</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= TAB 2: PERFIL DO TOMADOR ============================= -->
+<div class="page" id="page2">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Renda Média</div><div class="kpi-value kpi-neutral">R$ 4.693</div><div class="kpi-sub">Renda mensal</div></div>
+    <div class="kpi"><div class="kpi-label">Autônomos</div><div class="kpi-value kpi-warn">15,96%</div><div class="kpi-sub">798 de 5.000</div></div>
+    <div class="kpi"><div class="kpi-label">Com Avalista</div><div class="kpi-value kpi-neutral">18,70%</div><div class="kpi-sub">935 contratos</div></div>
+    <div class="kpi"><div class="kpi-label">Default &lt;R$2k renda</div><div class="kpi-value kpi-up">18,64%</div><div class="kpi-sub">Maior risco</div></div>
+    <div class="kpi"><div class="kpi-label">Default &gt;R$10k renda</div><div class="kpi-value kpi-down">7,66%</div><div class="kpi-sub">Menor risco</div></div>
+    <div class="kpi"><div class="kpi-label">Atraso Médio 1ª Parcela</div><div class="kpi-value kpi-warn">12,7 dias</div><div class="kpi-sub">Sinal de alerta precoce</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Taxa de Default por Faixa de Renda</div>
+      <div class="chart-sub">Clientes de menor renda têm risco significativamente maior</div>
+      <div class="chart-wrap"><canvas id="c-default-renda"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Taxa de Default por Faixa Etária</div>
+      <div class="chart-sub">Distribuição do risco por idade do tomador</div>
+      <div class="chart-wrap"><canvas id="c-default-idade"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Distribuição de Renda Mensal</div>
+      <div class="chart-sub">Volume de clientes por faixa de renda</div>
+      <div class="chart-wrap"><canvas id="c-renda-dist"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Utilização de Crédito vs Default</div>
+      <div class="chart-sub">Taxa de default por faixa de utilização de crédito</div>
+      <div class="chart-wrap"><canvas id="c-util-default"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Autônomo vs CLT — Comparativo de Risco</div>
+      <div class="chart-sub">Análise de perfil por situação empregatícia</div>
+      <div class="chart-wrap"><canvas id="c-autonomo"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Impacto do Avalista no Default</div>
+      <div class="chart-sub">Comparação de taxa de default com e sem avalista</div>
+      <div class="chart-wrap"><canvas id="c-avalista"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= TAB 3: PRODUTOS & CANAIS ============================= -->
+<div class="page" id="page3">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Empréstimo Pessoal</div><div class="kpi-value kpi-neutral">R$ 27,4M</div><div class="kpi-sub">49,3% da carteira</div></div>
+    <div class="kpi"><div class="kpi-label">Cartão de Crédito</div><div class="kpi-value kpi-neutral">R$ 20,9M</div><div class="kpi-sub">37,0% da carteira</div></div>
+    <div class="kpi"><div class="kpi-label">BNPL</div><div class="kpi-value kpi-warn">R$ 8,1M</div><div class="kpi-sub">14,4% — maior taxa default</div></div>
+    <div class="kpi"><div class="kpi-label">Canal App</div><div class="kpi-value kpi-down">44,6%</div><div class="kpi-sub">Melhor canal por volume</div></div>
+    <div class="kpi"><div class="kpi-label">Canal Parceiro</div><div class="kpi-value kpi-up">14,42%</div><div class="kpi-sub">Maior risco de default</div></div>
+    <div class="kpi"><div class="kpi-label">Ticket Médio BNPL</div><div class="kpi-value kpi-neutral">R$ 11.010</div><div class="kpi-sub">Menor ticket médio</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Volume Financeiro por Produto</div>
+      <div class="chart-sub">Valor total solicitado por tipo de produto (R$)</div>
+      <div class="chart-wrap"><canvas id="c-volume-produto"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ticket Médio por Produto</div>
+      <div class="chart-sub">Valor médio de contrato por tipo de produto</div>
+      <div class="chart-wrap"><canvas id="c-ticket-produto"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Contratos por Canal de Aquisição</div>
+      <div class="chart-sub">Volume e participação de cada canal</div>
+      <div class="chart-wrap"><canvas id="c-canal-volume"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Taxa de Default: Produto × Canal</div>
+      <div class="chart-sub">Cruzamento de risco entre produto e canal</div>
+      <div class="chart-wrap chart-wrap-tall" id="heatmap-area">
+        <p class="chart-sub" style="margin-bottom:12px">Heatmap: taxa de default (%)</p>
+        <div class="heatmap-col-labels">
+          <div class="heatmap-col-label">App</div>
+          <div class="heatmap-col-label">Loja</div>
+          <div class="heatmap-col-label">Parceiro</div>
+          <div class="heatmap-col-label">Site</div>
+        </div>
+        <div class="heatmap" id="heatmap"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-1">
+    <div class="chart-card">
+      <div class="chart-title">Prazo Médio por Produto</div>
+      <div class="chart-sub">Duração média dos contratos em meses</div>
+      <div class="chart-wrap"><canvas id="c-prazo-produto"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= TAB 4: SCORE & RISCO ============================= -->
+<div class="page" id="page4">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Score Médio</div><div class="kpi-value kpi-warn">653,6</div><div class="kpi-sub">Faixa 300–900</div></div>
+    <div class="kpi"><div class="kpi-label">Default Score &lt;550</div><div class="kpi-value kpi-up">17,8%</div><div class="kpi-sub">563 clientes nesta faixa</div></div>
+    <div class="kpi"><div class="kpi-label">Default Score 550–650</div><div class="kpi-value kpi-up">14,3%</div><div class="kpi-sub">Faixa mais populosa</div></div>
+    <div class="kpi"><div class="kpi-label">Default Score &gt;750</div><div class="kpi-value kpi-down">9,3%</div><div class="kpi-sub">635 clientes — menor risco</div></div>
+    <div class="kpi"><div class="kpi-label">Atraso 61d+ → Default</div><div class="kpi-value kpi-up">48,3%</div><div class="kpi-sub">Preditor mais forte</div></div>
+    <div class="kpi"><div class="kpi-label">Score &lt; 550 na base</div><div class="kpi-value kpi-warn">11,3%</div><div class="kpi-sub">563 contratos de risco</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Taxa de Default por Faixa de Score</div>
+      <div class="chart-sub">Relação inversa entre score e inadimplência</div>
+      <div class="chart-wrap"><canvas id="c-default-score"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Clientes por Faixa de Score</div>
+      <div class="chart-sub">Volume de contratos por faixa de score de crédito</div>
+      <div class="chart-wrap"><canvas id="c-score-volume"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-1">
+    <div class="chart-card">
+      <div class="chart-title">Score de Crédito vs Valor Solicitado (amostra 300)</div>
+      <div class="chart-sub">Vermelho = default | Azul = adimplente</div>
+      <div class="chart-wrap" id="scatter-wrap"><canvas id="c-scatter"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Distribuição dos Dias de Atraso Máximo (12m)</div>
+      <div class="chart-sub">Volume de contratos por faixa de atraso histórico</div>
+      <div class="chart-wrap"><canvas id="c-atraso-vol"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ranking de Preditores de Default</div>
+      <div class="chart-sub">Quais variáveis mais impactam a taxa de inadimplência</div>
+      <div style="padding-top:8px">
+        <div class="pbar-wrap"><div class="pbar-label">Atraso 61d+</div><div class="pbar-track"><div class="pbar-fill" style="width:100%;background:var(--red)"></div></div><div class="pbar-val" style="color:var(--red)">48,3%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Atraso 31-60d</div><div class="pbar-track"><div class="pbar-fill" style="width:55%;background:var(--red)"></div></div><div class="pbar-val" style="color:var(--red)">26,4%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Renda &lt; R$2k</div><div class="pbar-track"><div class="pbar-fill" style="width:39%;background:var(--orange)"></div></div><div class="pbar-val" style="color:var(--orange)">18,6%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Score &lt; 550</div><div class="pbar-track"><div class="pbar-fill" style="width:37%;background:var(--orange)"></div></div><div class="pbar-val" style="color:var(--orange)">17,8%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">1+ Inadimpl. Ant.</div><div class="pbar-track"><div class="pbar-fill" style="width:40%;background:var(--orange)"></div></div><div class="pbar-val" style="color:var(--orange)">19,2%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Produto BNPL</div><div class="pbar-track"><div class="pbar-fill" style="width:33%;background:var(--yellow)"></div></div><div class="pbar-val" style="color:var(--yellow)">15,8%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Canal Parceiro</div><div class="pbar-track"><div class="pbar-fill" style="width:30%;background:var(--yellow)"></div></div><div class="pbar-val" style="color:var(--yellow)">14,4%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Score 550-650</div><div class="pbar-track"><div class="pbar-fill" style="width:30%;background:var(--accent)"></div></div><div class="pbar-val" style="color:var(--accent)">14,3%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Atraso 16-30d</div><div class="pbar-track"><div class="pbar-fill" style="width:29%;background:var(--accent)"></div></div><div class="pbar-val" style="color:var(--accent)">18,3%</div></div>
+        <div class="pbar-wrap"><div class="pbar-label">Autônomo</div><div class="pbar-track"><div class="pbar-fill" style="width:20%;background:var(--teal)"></div></div><div class="pbar-val" style="color:var(--teal)">12,8%</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= TAB 5: REGIÕES ============================= -->
+<div class="page" id="page5">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Região líder</div><div class="kpi-value kpi-neutral">Sudeste</div><div class="kpi-sub">46% dos contratos</div></div>
+    <div class="kpi"><div class="kpi-label">Maior Risco</div><div class="kpi-value kpi-up">Norte</div><div class="kpi-sub">13,51% de default</div></div>
+    <div class="kpi"><div class="kpi-label">Menor Risco</div><div class="kpi-value kpi-down">Centro-Oeste</div><div class="kpi-sub">10,47% de default</div></div>
+    <div class="kpi"><div class="kpi-label">Sudeste — Carteira</div><div class="kpi-value kpi-neutral">R$ 25,9M</div><div class="kpi-sub">Maior concentração</div></div>
+    <div class="kpi"><div class="kpi-label">Norte — Contratos</div><div class="kpi-value kpi-warn">333</div><div class="kpi-sub">Menor base, maior risco</div></div>
+    <div class="kpi"><div class="kpi-label">Spread Norte-CO</div><div class="kpi-value kpi-up">+3,04 p.p.</div><div class="kpi-sub">Maior risco vs menor</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Taxa de Default por Região</div>
+      <div class="chart-sub">Inadimplência comparada entre regiões do Brasil</div>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="c-default-regiao"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Volume de Contratos por Região</div>
+      <div class="chart-sub">Quantidade e valor da carteira por região</div>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="c-volume-regiao"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-1">
+    <div class="chart-card">
+      <div class="chart-title">Resumo por Região — Tabela Completa</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Região</th><th>Contratos</th><th>% Carteira</th><th>Defaults</th><th>Taxa Default</th><th>Defaults em Atraso Leve</th><th>Risco</th></tr></thead>
+          <tbody>
+            <tr><td>Sudeste</td><td>2.300</td><td>46,0%</td><td>289</td><td><span class="badge badge-orange">12,57%</span></td><td>~214</td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Nordeste</td><td>956</td><td>19,1%</td><td>121</td><td><span class="badge badge-orange">12,66%</span></td><td>~89</td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Sul</td><td>800</td><td>16,0%</td><td>90</td><td><span class="badge badge-orange">11,25%</span></td><td>~74</td><td><span class="badge badge-orange">Médio</span></td></tr>
+            <tr><td>Centro-Oeste</td><td>611</td><td>12,2%</td><td>64</td><td><span class="badge badge-green">10,47%</span></td><td>~57</td><td><span class="badge badge-green">Baixo</span></td></tr>
+            <tr><td>Norte</td><td>333</td><td>6,7%</td><td>45</td><td><span class="badge badge-red">13,51%</span></td><td>~31</td><td><span class="badge badge-red">Alto</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= TAB 6: INSIGHTS ============================= -->
+<div class="page" id="page6">
+  <div class="section-header">Alertas críticos</div>
+  <div class="insight-grid">
+    <div class="insight">
+      <div class="insight-icon">🚨</div>
+      <div><div class="insight-title" style="color:var(--red)">Taxa de default acima do benchmark</div><div class="insight-text">A taxa geral de 12,18% supera o benchmark de mercado (8-10%). A carteira total de R$56,4M tem R$9,9M expostos em default.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">⚠️</div>
+      <div><div class="insight-title" style="color:var(--orange)">BNPL com risco 29% acima da média</div><div class="insight-text">Produto BNPL registra 15,76% de default — 29% acima da taxa geral. Revisão dos critérios de aprovação é recomendada.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">⚠️</div>
+      <div><div class="insight-title" style="color:var(--orange)">Canal Parceiro com maior inadimplência</div><div class="insight-text">14,42% de default no canal parceiro sugere seleção adversa. Reavaliação dos parceiros e critérios de originação são urgentes.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">🔴</div>
+      <div><div class="insight-title" style="color:var(--red)">Atraso &gt;61d: 48,3% tornam-se default</div><div class="insight-text">Contratos com atraso histórico superior a 61 dias têm probabilidade de quase 50% de default. Ação imediata de cobrança é essencial.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">🔴</div>
+      <div><div class="insight-title" style="color:var(--red)">Região Norte: menor base, maior risco</div><div class="insight-text">Com apenas 333 contratos (6,7% da base), o Norte tem a maior taxa de default (13,51%). Alta concentração de risco em carteira pequena.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">⚠️</div>
+      <div><div class="insight-title" style="color:var(--orange)">Renda &lt;R$2k: default de 18,6%</div><div class="insight-text">Clientes com renda abaixo de R$2.000 têm taxa de default 53% acima da média. Revisão do limite de crédito para esta faixa é recomendada.</div></div>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:8px">Oportunidades identificadas</div>
+  <div class="insight-grid">
+    <div class="insight">
+      <div class="insight-icon">✅</div>
+      <div><div class="insight-title" style="color:var(--green)">App é o canal mais saudável</div><div class="insight-text">Com 44,6% do volume e apenas 11,47% de default, o canal app apresenta melhor qualidade de originação. Potencial de expansão.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">✅</div>
+      <div><div class="insight-title" style="color:var(--green)">Score &gt;750 reduz default para 9,3%</div><div class="insight-text">Clientes com score acima de 750 têm taxa quase 25% abaixo da média geral. Estratégias para atrair este perfil podem melhorar a carteira.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">✅</div>
+      <div><div class="insight-title" style="color:var(--green)">Avalista reduz marginalmente o risco</div><div class="insight-text">Contratos com avalista têm 11,66% de default vs 12,30% sem avalista. Incentivo ao uso de avalista em operações de maior valor pode ajudar.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">💡</div>
+      <div><div class="insight-title" style="color:var(--accent)">Renda &gt;R$10k: default de apenas 7,7%</div><div class="insight-text">Clientes com alta renda têm risco significativamente menor. Expansão de produtos para este segmento pode melhorar KPIs da carteira.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">💡</div>
+      <div><div class="insight-title" style="color:var(--accent)">Centro-Oeste: menor risco regional</div><div class="insight-text">Com 10,47% de default e crescimento de carteira, Centro-Oeste é a melhor região para expansão. Pode receber limites mais agressivos.</div></div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">💡</div>
+      <div><div class="insight-title" style="color:var(--accent)">463 contratos em atraso leve monitoráveis</div><div class="insight-text">9,3% da carteira está em atraso leve — ainda não é default. Ação proativa de cobrança pode evitar que migrem para inadimplência.</div></div>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top:8px">Recomendações estratégicas</div>
+  <div class="chart-card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Prioridade</th><th>Área</th><th>Recomendação</th><th>Impacto Estimado</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge badge-red">1 — Urgente</span></td><td>Cobrança</td><td>Acionar cobrança ativa em 211 contratos com atraso &gt;61d</td><td>Reduzir default futuro em até 4-5%</td></tr>
+          <tr><td><span class="badge badge-red">2 — Urgente</span></td><td>Originação BNPL</td><td>Elevar score mínimo para aprovação de BNPL</td><td>Reduzir taxa de 15,8% para ~12%</td></tr>
+          <tr><td><span class="badge badge-orange">3 — Alto</span></td><td>Canal Parceiro</td><td>Revisar critérios dos parceiros com taxa &gt;14%</td><td>Reduzir risco do canal em 2-3 p.p.</td></tr>
+          <tr><td><span class="badge badge-orange">4 — Alto</span></td><td>Segmento Renda &lt;2k</td><td>Limitar ticket máximo para tomadores com renda &lt;R$2.000</td><td>Reduzir exposição em ~R$1,2M</td></tr>
+          <tr><td><span class="badge badge-blue">5 — Médio</span></td><td>Expansão</td><td>Ampliar carteira no Centro-Oeste e via canal app</td><td>Melhorar qualidade média da carteira</td></tr>
+          <tr><td><span class="badge badge-blue">6 — Médio</span></td><td>Monitoramento</td><td>Criar alerta automático para contratos em atraso leve (463)</td><td>Converter até 30% de volta à adimplência</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== TAB SYSTEM =====
+function showTab(i) {
+  document.querySelectorAll('.page').forEach((p,j) => p.classList.toggle('active', i===j));
+  document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', i===j));
+}
+
+// ===== CHART DEFAULTS =====
+Chart.defaults.color = '#8b90a0';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+
+const COLORS = {
+  blue: '#4f8ef7', purple: '#7c5af3', green: '#22c97b',
+  red: '#f05252', orange: '#f5a623', teal: '#14b8a6',
+  pink: '#ec4899', yellow: '#f59e0b', muted: '#8b90a0'
+};
+
+const fmtPct = v => (v*100).toFixed(1)+'%';
+const fmtBRL = v => 'R$ '+v.toLocaleString('pt-BR',{maximumFractionDigits:0});
+
+function barChart(id, labels, datasets, opts={}) {
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12, padding: 16 } }, tooltip: { callbacks: { label: opts.tooltipLabel || (c => c.formattedValue) } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: opts.yTicks || {} }
+      },
+      ...opts.extra
+    }
+  });
+}
+
+function donutChart(id, labels, data, colors) {
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#1a1f2e', borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } } }, cutout: '62%' }
+  });
+}
+
+// ===== TAB 0 =====
+donutChart('c-status-donut',
+  ['Em dia','Em atraso leve','Default'],
+  [3928, 463, 609],
+  [COLORS.green, COLORS.yellow, COLORS.red]
+);
+
+barChart('c-produto-bar',
+  ['Empréstimo Pessoal','Cartão','BNPL'],
+  [{label:'Contratos', data:[2465,1799,736], backgroundColor:[COLORS.blue,COLORS.purple,COLORS.orange], borderRadius:6, borderSkipped:false}]
+);
+
+donutChart('c-canal-donut',
+  ['App','Site','Parceiro','Loja'],
+  [2231,1274,749,746],
+  [COLORS.blue, COLORS.teal, COLORS.orange, COLORS.purple]
+);
+
+barChart('c-regiao-bar',
+  ['Sudeste','Nordeste','Sul','Centro-Oeste','Norte'],
+  [{label:'Contratos', data:[2300,956,800,611,333], backgroundColor:[COLORS.blue,COLORS.teal,COLORS.purple,COLORS.green,COLORS.orange], borderRadius:6, borderSkipped:false}]
+);
+
+barChart('c-score-hist',
+  ['300-450','450-550','550-650','650-750','750-1000'],
+  [{label:'Contratos', data:[40,523,1839,1963,635], backgroundColor:COLORS.accent2||COLORS.purple, borderRadius:6, borderSkipped:false}]
+);
+
+// ===== TAB 1 =====
+barChart('c-default-produto',
+  ['BNPL','Cartão','Empréstimo Pessoal'],
+  [{label:'Taxa de Default (%)', data:[15.76,12.01,11.24], backgroundColor:[COLORS.red,COLORS.orange,COLORS.yellow], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-default-canal',
+  ['Parceiro','Loja','Site','App'],
+  [{label:'Taxa de Default (%)', data:[14.42,12.73,11.77,11.47], backgroundColor:[COLORS.red,COLORS.orange,COLORS.yellow,COLORS.green], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-default-atraso',
+  ['0 dias','1-15 dias','16-30 dias','31-60 dias','61+ dias'],
+  [{label:'Taxa de Default (%)', data:[8.12,10.41,18.31,26.43,48.34], backgroundColor:[COLORS.green,COLORS.teal,COLORS.yellow,COLORS.orange,COLORS.red], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-default-inadimp',
+  ['0 inadimpl.','1 inadimpl.','2 inadimpl.','3 inadimpl.'],
+  [{label:'Taxa de Default (%)', data:[10.16,19.22,18.78,22.22], backgroundColor:[COLORS.green,COLORS.orange,COLORS.orange,COLORS.red], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+// ===== TAB 2 =====
+barChart('c-default-renda',
+  ['<R$2k','R$2k-4k','R$4k-6k','R$6k-10k','>R$10k'],
+  [{label:'Taxa de Default (%)', data:[18.64,11.95,9.41,8.38,7.66], backgroundColor:[COLORS.red,COLORS.orange,COLORS.yellow,COLORS.teal,COLORS.green], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-default-idade',
+  ['18-25','25-35','35-45','45-55','55+'],
+  [{label:'Taxa de Default (%)', data:[12.57,11.27,13.0,11.52,12.54], backgroundColor:COLORS.blue, borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-renda-dist',
+  ['<R$2k','R$2k-4k','R$4k-6k','R$6k-10k','>R$10k'],
+  [{label:'Clientes', data:[1057,1690,903,740,418], backgroundColor:COLORS.purple, borderRadius:6, borderSkipped:false}]
+);
+
+barChart('c-util-default',
+  ['0-20%','20-40%','40-60%','60-80%','80-100%'],
+  [{label:'Taxa de Default (%)', data:[10.59,11.58,14.09,15.16,10.0], backgroundColor:[COLORS.green,COLORS.teal,COLORS.yellow,COLORS.orange,COLORS.red], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-autonomo',
+  ['CLT / Empregado','Autônomo'],
+  [{label:'Contratos', data:[4202,798], backgroundColor:[COLORS.blue,COLORS.orange], borderRadius:6, borderSkipped:false},
+   {label:'Taxa Default (%)', data:[12.07,12.78], backgroundColor:[COLORS.teal,COLORS.red], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.dataset.label === 'Taxa Default (%)' ? c.formattedValue+'%' : c.formattedValue+' contratos' }
+);
+
+barChart('c-avalista',
+  ['Sem Avalista','Com Avalista'],
+  [{label:'Taxa de Default (%)', data:[12.30,11.66], backgroundColor:[COLORS.orange,COLORS.green], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+// ===== TAB 3 =====
+barChart('c-volume-produto',
+  ['Empréstimo Pessoal','Cartão','BNPL'],
+  [{label:'Volume (R$ M)', data:[27.42,20.87,8.10], backgroundColor:[COLORS.blue,COLORS.purple,COLORS.orange], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => 'R$ '+parseFloat(c.formattedValue).toFixed(1)+'M' }
+);
+
+barChart('c-ticket-produto',
+  ['Cartão','Empréstimo Pessoal','BNPL'],
+  [{label:'Ticket Médio (R$)', data:[11600,11123,11010], backgroundColor:[COLORS.purple,COLORS.blue,COLORS.orange], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => 'R$ '+parseInt(c.formattedValue).toLocaleString('pt-BR') }
+);
+
+barChart('c-canal-volume',
+  ['App','Site','Parceiro','Loja'],
+  [{label:'Contratos', data:[2231,1274,749,746], backgroundColor:[COLORS.blue,COLORS.teal,COLORS.orange,COLORS.purple], borderRadius:6, borderSkipped:false}]
+);
+
+// HEATMAP
+const heatData = {
+  'Emp. Pessoal': [10.8, 12.1, 13.9, 10.9],
+  'Cartão':       [11.2, 13.1, 14.8, 11.3],
+  'BNPL':         [14.1, 15.8, 17.2, 14.9],
+};
+const heatEl = document.getElementById('heatmap');
+Object.entries(heatData).forEach(([produto, vals]) => {
+  const row = document.createElement('div');
+  row.className = 'heatmap-row';
+  const lbl = document.createElement('div');
+  lbl.className = 'heatmap-label';
+  lbl.textContent = produto;
+  row.appendChild(lbl);
+  vals.forEach(v => {
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-cell';
+    const intensity = (v - 10) / 8;
+    const r = Math.round(79 + (240-79)*intensity);
+    const g = Math.round(142 + (82-142)*intensity);
+    const b = Math.round(247 + (82-247)*intensity);
+    cell.style.background = `rgb(${r},${g},${b})`;
+    cell.textContent = v.toFixed(1)+'%';
+    row.appendChild(cell);
+  });
+  heatEl.appendChild(row);
+});
+
+barChart('c-prazo-produto',
+  ['Empréstimo Pessoal','Cartão','BNPL'],
+  [{label:'Prazo Médio (meses)', data:[25.8,25.5,24.3], backgroundColor:[COLORS.blue,COLORS.purple,COLORS.orange], borderRadius:6, borderSkipped:false}]
+);
+
+// ===== TAB 4 =====
+barChart('c-default-score',
+  ['300-450','450-550','550-650','650-750','750-1000'],
+  [{label:'Taxa de Default (%)', data:[17.5,17.78,14.3,9.53,9.29], backgroundColor:[COLORS.red,COLORS.red,COLORS.orange,COLORS.teal,COLORS.green], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-score-volume',
+  ['300-450','450-550','550-650','650-750','750-1000'],
+  [{label:'Contratos', data:[40,523,1839,1963,635], backgroundColor:[COLORS.red,COLORS.orange,COLORS.yellow,COLORS.teal,COLORS.green], borderRadius:6, borderSkipped:false}]
+);
+
+// SCATTER
+const scatterRaw = [{"score_credito":724,"valor_solicitado":7470.84,"renda_mensal":800.0,"default_90d":1,"idade":31},{"score_credito":658,"valor_solicitado":1490.49,"renda_mensal":8951.27,"default_90d":0,"idade":37},{"score_credito":683,"valor_solicitado":2655.09,"renda_mensal":1626.12,"default_90d":0,"idade":37},{"score_credito":627,"valor_solicitado":11223.99,"renda_mensal":9434.42,"default_90d":0,"idade":70},{"score_credito":623,"valor_solicitado":2932.03,"renda_mensal":1770.06,"default_90d":0,"idade":47},{"score_credito":514,"valor_solicitado":5319.19,"renda_mensal":2528.29,"default_90d":0,"idade":59},{"score_credito":730,"valor_solicitado":11324.34,"renda_mensal":5042.37,"default_90d":0,"idade":62},{"score_credito":623,"valor_solicitado":12721.44,"renda_mensal":8588.08,"default_90d":0,"idade":19},{"score_credito":682,"valor_solicitado":6194.5,"renda_mensal":11287.01,"default_90d":1,"idade":28},{"score_credito":709,"valor_solicitado":24008.14,"renda_mensal":1155.87,"default_90d":1,"idade":46},{"score_credito":666,"valor_solicitado":27383.85,"renda_mensal":4558.88,"default_90d":0,"idade":55},{"score_credito":482,"valor_solicitado":1329.74,"renda_mensal":3081.32,"default_90d":0,"idade":49},{"score_credito":831,"valor_solicitado":18549.75,"renda_mensal":800.0,"default_90d":0,"idade":34},{"score_credito":573,"valor_solicitado":60000.0,"renda_mensal":1875.96,"default_90d":1,"idade":63},{"score_credito":712,"valor_solicitado":4771.93,"renda_mensal":8280.93,"default_90d":0,"idade":51},{"score_credito":614,"valor_solicitado":13518.12,"renda_mensal":5036.25,"default_90d":1,"idade":48},{"score_credito":550,"valor_solicitado":17145.08,"renda_mensal":6357.7,"default_90d":1,"idade":28},{"score_credito":529,"valor_solicitado":21815.9,"renda_mensal":null,"default_90d":1,"idade":40},{"score_credito":614,"valor_solicitado":8174.87,"renda_mensal":1368.72,"default_90d":0,"idade":55},{"score_credito":469,"valor_solicitado":24246.48,"renda_mensal":6587.3,"default_90d":0,"idade":37},{"score_credito":595,"valor_solicitado":17128.35,"renda_mensal":5838.99,"default_90d":0,"idade":53},{"score_credito":615,"valor_solicitado":15770.0,"renda_mensal":1367.23,"default_90d":1,"idade":50},{"score_credito":760,"valor_solicitado":9891.6,"renda_mensal":3776.56,"default_90d":0,"idade":65},{"score_credito":727,"valor_solicitado":8280.06,"renda_mensal":1897.15,"default_90d":0,"idade":26},{"score_credito":756,"valor_solicitado":4478.07,"renda_mensal":859.84,"default_90d":0,"idade":29},{"score_credito":460,"valor_solicitado":2485.99,"renda_mensal":1542.41,"default_90d":1,"idade":43},{"score_credito":867,"valor_solicitado":19141.28,"renda_mensal":923.57,"default_90d":1,"idade":41},{"score_credito":480,"valor_solicitado":2575.83,"renda_mensal":9664.78,"default_90d":1,"idade":34},{"score_credito":704,"valor_solicitado":30559.28,"renda_mensal":2734.84,"default_90d":1,"idade":45},{"score_credito":601,"valor_solicitado":36002.43,"renda_mensal":1873.51,"default_90d":1,"idade":70},{"score_credito":645,"valor_solicitado":27926.85,"renda_mensal":1662.57,"default_90d":1,"idade":48},{"score_credito":520,"valor_solicitado":17006.36,"renda_mensal":5534.57,"default_90d":1,"idade":31},{"score_credito":605,"valor_solicitado":10100.3,"renda_mensal":4131.55,"default_90d":1,"idade":44},{"score_credito":700,"valor_solicitado":4608.99,"renda_mensal":4082.41,"default_90d":1,"idade":21},{"score_credito":511,"valor_solicitado":10150.98,"renda_mensal":14345.27,"default_90d":1,"idade":20},{"score_credito":521,"valor_solicitado":11925.38,"renda_mensal":1550.9,"default_90d":1,"idade":69},{"score_credito":603,"valor_solicitado":11482.72,"renda_mensal":3976.96,"default_90d":1,"idade":47},{"score_credito":625,"valor_solicitado":4232.43,"renda_mensal":2521.85,"default_90d":1,"idade":70},{"score_credito":673,"valor_solicitado":2357.33,"renda_mensal":3923.52,"default_90d":1,"idade":30},{"score_credito":798,"valor_solicitado":8237.39,"renda_mensal":8817.58,"default_90d":1,"idade":68},{"score_credito":711,"valor_solicitado":11968.09,"renda_mensal":8973.89,"default_90d":1,"idade":37},{"score_credito":590,"valor_solicitado":4306.8,"renda_mensal":5231.81,"default_90d":1,"idade":46},{"score_credito":693,"valor_solicitado":8578.83,"renda_mensal":2219.13,"default_90d":1,"idade":23},{"score_credito":592,"valor_solicitado":5977.93,"renda_mensal":3320.29,"default_90d":1,"idade":24},{"score_credito":552,"valor_solicitado":16226.9,"renda_mensal":1259.95,"default_90d":1,"idade":67},{"score_credito":615,"valor_solicitado":10460.86,"renda_mensal":4252.35,"default_90d":0,"idade":57},{"score_credito":672,"valor_solicitado":6257.08,"renda_mensal":869.49,"default_90d":1,"idade":35},{"score_credito":673,"valor_solicitado":13824.47,"renda_mensal":8149.61,"default_90d":1,"idade":58},{"score_credito":835,"valor_solicitado":60000.0,"renda_mensal":2319.85,"default_90d":0,"idade":67},{"score_credito":863,"valor_solicitado":4645.07,"renda_mensal":2365.72,"default_90d":0,"idade":46},{"score_credito":800,"valor_solicitado":5309.55,"renda_mensal":3609.85,"default_90d":0,"idade":37},{"score_credito":785,"valor_solicitado":5819.14,"renda_mensal":1457.83,"default_90d":0,"idade":20},{"score_credito":776,"valor_solicitado":12268.61,"renda_mensal":9815.31,"default_90d":0,"idade":50},{"score_credito":788,"valor_solicitado":17509.9,"renda_mensal":4080.8,"default_90d":0,"idade":47},{"score_credito":764,"valor_solicitado":19883.33,"renda_mensal":1982.89,"default_90d":0,"idade":45},{"score_credito":755,"valor_solicitado":20862.94,"renda_mensal":5140.8,"default_90d":0,"idade":36},{"score_credito":860,"valor_solicitado":26017.46,"renda_mensal":2875.0,"default_90d":0,"idade":26},{"score_credito":829,"valor_solicitado":2760.42,"renda_mensal":11998.88,"default_90d":0,"idade":41},{"score_credito":818,"valor_solicitado":7780.33,"renda_mensal":3994.76,"default_90d":0,"idade":29},{"score_credito":809,"valor_solicitado":1842.66,"renda_mensal":1564.48,"default_90d":0,"idade":63},{"score_credito":812,"valor_solicitado":10674.45,"renda_mensal":800.0,"default_90d":0,"idade":28},{"score_credito":823,"valor_solicitado":7576.64,"renda_mensal":8176.64,"default_90d":0,"idade":64},{"score_credito":824,"valor_solicitado":18291.03,"renda_mensal":7266.39,"default_90d":0,"idade":29},{"score_credito":852,"valor_solicitado":4283.98,"renda_mensal":null,"default_90d":0,"idade":68},{"score_credito":816,"valor_solicitado":15794.64,"renda_mensal":1793.4,"default_90d":0,"idade":22},{"score_credito":783,"valor_solicitado":5885.18,"renda_mensal":5262.56,"default_90d":0,"idade":33},{"score_credito":783,"valor_solicitado":22768.93,"renda_mensal":1018.58,"default_90d":0,"idade":62},{"score_credito":783,"valor_solicitado":3514.31,"renda_mensal":868.4,"default_90d":0,"idade":27}];
+
+const defaultPts = scatterRaw.filter(d => d.default_90d===1).map(d => ({x:d.score_credito, y:d.valor_solicitado}));
+const okPts = scatterRaw.filter(d => d.default_90d===0).map(d => ({x:d.score_credito, y:d.valor_solicitado}));
+new Chart(document.getElementById('c-scatter'), {
+  type: 'scatter',
+  data: { datasets: [
+    { label:'Default', data:defaultPts, backgroundColor:'rgba(240,82,82,0.7)', pointRadius:5 },
+    { label:'Adimplente', data:okPts, backgroundColor:'rgba(79,142,247,0.45)', pointRadius:4 }
+  ]},
+  options: {
+    responsive:true, maintainAspectRatio:true,
+    plugins:{ legend:{labels:{boxWidth:12}} },
+    scales:{
+      x:{title:{display:true,text:'Score de Crédito'}, grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{title:{display:true,text:'Valor Solicitado (R$)'}, ticks:{callback:v=>'R$'+Math.round(v/1000)+'k'}, grid:{color:'rgba(255,255,255,0.05)'}}
+    }
+  }
+});
+
+barChart('c-atraso-vol',
+  ['0 dias','1-15 dias','16-30 dias','31-60 dias','61+ dias'],
+  [{label:'Contratos', data:[3018,1076,415,280,211], backgroundColor:[COLORS.green,COLORS.teal,COLORS.yellow,COLORS.orange,COLORS.red], borderRadius:6, borderSkipped:false}]
+);
+
+// ===== TAB 5 =====
+barChart('c-default-regiao',
+  ['Norte','Nordeste','Sudeste','Sul','Centro-Oeste'],
+  [{label:'Taxa de Default (%)', data:[13.51,12.66,12.57,11.25,10.47], backgroundColor:[COLORS.red,COLORS.orange,COLORS.orange,COLORS.yellow,COLORS.green], borderRadius:6, borderSkipped:false}],
+  { tooltipLabel: c => c.formattedValue+'%', yTicks: { callback: v => v+'%' } }
+);
+
+barChart('c-volume-regiao',
+  ['Sudeste','Nordeste','Sul','Centro-Oeste','Norte'],
+  [{label:'Contratos', data:[2300,956,800,611,333], backgroundColor:COLORS.blue, borderRadius:6, borderSkipped:false},
+   {label:'Defaults', data:[289,121,90,64,45], backgroundColor:COLORS.red, borderRadius:6, borderSkipped:false}]
+);
+</script>
+</body>
+</html>
